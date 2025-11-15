@@ -1,0 +1,161 @@
+# In MASTER NODE
+#!/bin/bash
+set -e
+
+########## UPDATE SYSTEM ##########
+apt update -y
+apt upgrade -y
+
+########## INSTALL DOCKER ##########
+apt install -y ca-certificates curl gnupg lsb-release
+
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu noble stable" \
+  | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+apt update -y
+apt install -y docker-ce docker-ce-cli containerd.io
+
+systemctl enable docker
+systemctl start docker
+
+
+########## INSTALL CRI-DOCKERD ##########
+apt install -y git golang-go
+
+git clone https://github.com/Mirantis/cri-dockerd.git
+cd cri-dockerd
+
+mkdir -p bin
+go build -o bin/cri-dockerd
+
+install -o root -g root -m 755 bin/cri-dockerd /usr/local/bin/
+
+cp -a packaging/systemd/* /etc/systemd/system/
+
+sed -i 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' \
+    /etc/systemd/system/cri-docker.service
+
+systemctl daemon-reload
+systemctl enable --now cri-docker
+
+
+########## INSTALL KUBERNETES 1.30 ##########
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | \
+    gpg --dearmor \
+    | tee /etc/apt/keyrings/kubernetes.gpg > /dev/null
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes.gpg] \
+    https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /" \
+    | tee /etc/apt/sources.list.d/kubernetes.list
+
+apt update -y
+apt install -y kubelet kubeadm kubectl
+apt-mark hold kubelet kubeadm kubectl
+
+
+########## DISABLE SWAP ##########
+swapoff -a
+sed -i '/ swap / s/^/#/' /etc/fstab
+
+
+########## INIT MASTER ##########
+kubeadm init --cri-socket unix:///var/run/cri-dockerd.sock
+
+
+########## CONFIGURE kubectl FOR ROOT ##########
+mkdir -p /root/.kube
+cp -i /etc/kubernetes/admin.conf /root/.kube/config
+chown root:root /root/.kube/config
+
+
+########## INSTALL CALICO CNI ##########
+curl https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml -O
+kubectl apply -f calico.yaml
+
+echo "MASTER SETUP COMPLETE
+
+ # WORKER NODE SET UP
+"#!/bin/bash
+set -e
+
+########## UPDATE SYSTEM ##########
+apt update -y
+apt upgrade -y
+
+########## INSTALL DOCKER ##########
+apt install -y ca-certificates curl gnupg lsb-release
+
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+    gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu noble stable" \
+  | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+apt update -y
+apt install -y docker-ce docker-ce-cli containerd.io
+
+systemctl enable docker
+systemctl start docker
+
+
+########## INSTALL CRI-DOCKERD ##########
+apt install -y git golang-go
+
+git clone https://github.com/Mirantis/cri-dockerd.git
+cd cri-dockerd
+
+mkdir -p bin
+go build -o bin/cri-dockerd
+
+install -o root -g root -m 755 bin/cri-dockerd /usr/local/bin/
+
+cp -a packaging/systemd/* /etc/systemd/system/
+
+sed -i 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' \
+    /etc/systemd/system/cri-docker.service
+
+systemctl daemon-reload
+systemctl enable --now cri-docker
+
+
+########## INSTALL KUBERNETES 1.30 ##########
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | \
+    gpg --dearmor \
+    | tee /etc/apt/keyrings/kubernetes.gpg > /dev/null
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes.gpg] \
+    https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /" \
+    | tee /etc/apt/sources.list.d/kubernetes.list
+
+apt update -y
+apt install -y kubelet kubeadm kubectl
+apt-mark hold kubelet kubeadm kubectl
+
+
+########## DISABLE SWAP ##########
+swapoff -a
+sed -i '/ swap / s/^/#/' /etc/fstab
+
+echo "NODE READY — NOW RUN THE JOIN COMMAND"
+
+
+# WORKER-NODE
+ NOW IN THE MASTER NODE
+kubeadm token create --print-join-command
+ 
+PASTE in the Worker Node
+kubeadm join 172.31.2.221:6443 --cri-socket unix:///var/run/cri-dockerd.sock --token i4he8n.ojo682wpxvblftfw --discovery-token-ca-cert-hash sha256:69f3252b8cc95c310f77bbe8e2b98bc034cf0dc86eb1f4d984fc61a3970a4a96
+
+
+
+
+
